@@ -1,0 +1,589 @@
+---
+---
+---
+
+## CENG 4515 - DATA SCIENCE AND ANALYTICS FINAL PROJECT
+
+### Author : Süleyman Emre Parlak
+
+### Dataset : Food Delivery Times
+
+### 1. Please find your original dataset or datasets; and describe your data in the first step.
+
+```{r}
+library(dplyr)
+
+data <- read.csv("C:/Users/emre-/Desktop/Food_Delivery_Times.csv")
+data <- data %>%
+  mutate(across(where(is.character), ~ na_if(., "")))
+print(head(data))
+```
+
+I labeled the "" values as Na.
+
+Key Features :
+
+Order_ID : Unique identifier for each order.
+
+Distance_km : The delivery distance in kilometers.
+
+Weather : Weather conditions during the delivery. Including Clear, Rainy, Snowy, Foggy, Windy.
+
+Traffic_Level : Traffic conditions categorized as Low, Medium or High.
+
+Time_of_Day : The time when the delivery took place, categorized as Morning, Afternoon, Evening or Night.
+
+Vehicle_Type : Type of vehicle used for delivery, including Bike, Scooter, and Car.
+
+Preparation_Time_min : The time required to prepare the order, measured in minutes.
+
+Courier_Experience_yrs : Experience of the courier in years.
+
+Delivery_Time_min : The total delivery time in minutes.
+
+### 2. Use "Explaratory data analysis". Write down your comments.
+
+```{r}
+str(data)
+```
+
+The dataset consists of 1,000 observations and 9 variables. Some of the variables are numerical, while others are categorical, represented as character types.
+
+```{r}
+missing_data_percentage <- colSums(is.na(data)) / nrow(data) * 100
+print(colSums(is.na(data)))
+print(missing_data_percentage)
+```
+
+Here, I checked for missing values in the dataset. As observed, there are 30 missing values in the "Courier_Experience_yrs","Weather","Traffic_Level","Time_of_Day" columns, which means %3 data in each of these columns is missing (calculated as 30 \* 100 / number of rows).
+
+```{r}
+library(dplyr)
+numeric_columns <- data %>% select(Distance_km, Preparation_Time_min, Courier_Experience_yrs, Delivery_Time_min)
+cor_matrix <- cor(numeric_columns, use = "complete.obs")
+
+print(cor_matrix)
+```
+
+As I checked the correlation between the numerical variables, I found a strong positive correlation between distance and delivery time. There is a moderate positive correlation between preparation time and delivery time. Additionally, there is a slight negative correlation between courier experience and delivery time, indicating that the experience level does not have a significant impact on delivery time.
+
+### 3. Use some "visualization techniques" and talk about your data further.
+
+Let's check if the weather affects delivery times based on the type of vehicle.
+
+```{r}
+library(ggplot2)
+
+ggplot(data, aes(x = Weather, y = Delivery_Time_min, fill = Vehicle_Type)) +
+  geom_boxplot() +
+  labs(title = "Vehicle Type's Effect on Delivery Time by Weather",
+       x = "Weather Conditions",
+       y = "Delivery Time (minutes)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Accordingly;
+
+-   Clear : On average, bikes and scooters are faster than cars. In some situations bike slower.
+
+-   Foggy : Scooter faster on average, car has min variance.
+
+-   Rainy : Car should be selected for faster delivery.
+
+-   Snowy : Bike faster on average and has min variance.
+
+-   Windy : On average, car is faster but has max variance.
+
+-   Other : Car is faster on average.
+
+Now, let's compare the time of day with the delivery time.
+
+```{r}
+ggplot(data, aes(x = Time_of_Day, y = Delivery_Time_min)) +
+  geom_boxplot() +
+  labs(title = "Delivery Time by Time of Day", x = "Time of Day", y = "Delivery Time (min)")
+```
+
+As observed, the 'Time of Day' has no significant effect on the delivery time. The outliers seen in the evening and morning could potentially be caused by traffic. During the night, I can only observe a slight difference with faster deliveries. The variances for all times of day are approximately the same.
+
+```{r}
+ggplot(data, aes(x = Delivery_Time_min)) +
+  geom_histogram(binwidth = 5, fill = "skyblue", color = "black", alpha = 0.7) +
+  labs(title = "Histogram of Delivery Time", x = "Delivery Time (minutes)", y = "Frequency") +
+  theme_minimal()
+```
+
+```{r}
+mean(data$Delivery_Time_min)
+max(data$Delivery_Time_min)
+min(data$Delivery_Time_min)
+```
+
+This histogram shows us the distribution of the Delivery_Time_min column. I can say that this is distributed like right skewed and established between 8 and 153. The mean is 56.732.
+
+### 4. Check your data for multicollinearity, make your comments.
+
+```{r}
+library(reshape2)
+cor_matrix <- cor(data[, sapply(data, is.numeric)], use = "complete.obs")
+cor_melted <- melt(cor_matrix)
+
+ggplot(cor_melted, aes(Var1, Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", midpoint = 0, limit = c(-1, 1)) +
+  theme_minimal() +
+  labs(title = "Correlation Matrix Heatmap", x = "Variables", y = "Variables") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+In this heatmap, I can see a strong correlation between Distance_km and Delivery_Time_min. I may need to consider removing or combining highly correlated variables, as high multicollinearity can lead to unstable estimates in regression models and negatively affect the model's performance. Additionally, Preparation_Time_min has a weak correlation with Delivery_Time_min. At last, I would say that Courier_Experience_yrs does not have a significant impact on delivery time.
+
+### 5. Apply PCA.
+
+1.  Use appropriate functions and arguments.
+
+    ```{r}
+    numerical_cols <- data[, c("Distance_km", "Preparation_Time_min", "Courier_Experience_yrs", "Delivery_Time_min")]
+    data_finite <- numerical_cols[is.finite(rowSums(numerical_cols)),]
+    num_data_scaled <- scale(data_finite)
+
+    pca <- prcomp(num_data_scaled, center=TRUE, scale. = TRUE)
+    summary(pca)
+    ```
+
+2.  Use visualization techniques for PCA, describe the result!
+
+    ```{r}
+    biplot(pca, main = "Biplot of the PCA results.")
+    ```
+
+    The PCA biplot shows strong correlation between Distance_km and Delivery_Time_min, while Courier_Experience_yrs and Preparation_Time_min have minimal impact.
+
+3.  Make your final comments clearly (releate with question 4)!
+
+    PCA confirms the strong link between Distance_km and Delivery_Time_min, supporting the need to address multicollinearity. Preparation_Time_min has a weak influence, and Courier_Experience_yrs shows little impact, aligning with the findings in Question 4.
+
+### 6. Apply Logistic Regression or Regression.
+
+1.  Write down the formula of regression, then use appropriate functions and arguments.
+
+    Logistic Regression formula : y = ß0 + ß1X1 + ß2X2 + ... + ßnXn
+
+    Vehicle type tried to predicted by logistic regression. Code :
+
+    ```{r}
+    library(nnet)
+
+    data2 <- data[complete.cases(data), ]
+
+    car_samples <- data2[data2$Vehicle_Type == "Car", ]
+    scooter_samples <- data2[data2$Vehicle_Type == "Scooter", ]
+    bike_samples <- data2[data2$Vehicle_Type == "Bike", ]
+
+    set.seed(10)
+
+    car_samples <- car_samples[sample(nrow(car_samples), 100), ]
+    scooter_samples <- scooter_samples[sample(nrow(scooter_samples), 150), ]
+    bike_samples <- bike_samples[sample(nrow(bike_samples), 200), ]
+
+    data2 <- rbind(car_samples, scooter_samples, bike_samples)
+    data2 <- data2[sample(nrow(data2)), ]
+
+    multinom_model <- multinom(Vehicle_Type ~ Distance_km + Weather + Traffic_Level + Time_of_Day + Preparation_Time_min + Courier_Experience_yrs + Delivery_Time_min, data = data2)
+
+    summary(multinom_model)
+    ```
+
+2.  Use visualization techniques for Regression, describe the result!
+
+    ```{r}
+    library(caret)
+    library(ggplot2)
+
+    predictions <- predict(multinom_model, newdata = data2, type = "class")
+    conf_matrix <- confusionMatrix(factor(predictions), factor(data2$Vehicle_Type))
+    conf_matrix_df <- as.data.frame(as.table(conf_matrix$table))
+
+    colnames(conf_matrix_df) <- c("Actual", "Predicted", "Freq")
+
+    ggplot(conf_matrix_df, aes(x = Actual, y = Predicted, fill = Freq)) +
+      geom_tile() +
+      geom_text(aes(label = Freq), color = "white", size = 4) +
+      scale_fill_gradient(low = "white", high = "black") +
+      labs(title = "Confusion Matrix", x = "Actual", y = "Predicted") +
+      theme_minimal()
+    ```
+
+    If we analyse it, we can say that the model is confused on predicting bike and scooter half and half. And the model is not too bad at predicting car.
+
+3.  Which performance scores you chose? What is the final result? Make your final comments clearly!
+
+    ```{r}
+    print(conf_matrix)
+    ```
+
+    The model has a accuracy of 48.89%, with varying class sensitivities. "Bike" has high sensitivity (79%), meaning it is good at identifying "Bike" instances, while "Car" and "Scooter" have lower sensitivities (17% and 30%), indicating difficulty identifying these classes. Specificity is highest for "Car" (94.86%), showing good performance in identifying non-"Car" instances, while "Bike" has low specificity (34%), suggesting frequent misclassification of other classes as "Bike."
+
+### 7. Apply at least 2 Clustering Techniques.
+
+a\. Describe the reason you choose those 2 techniques.
+
+I chose K-Means for its efficiency with large datasets and predefined clusters, and Agglomerative Clustering for its flexibility in handling arbitrary cluster shapes.
+
+#### K-Means Clustering
+
+1.  Use appropriate functions and arguments.
+
+    ```{r}
+
+    data4 <- data
+    data4 <- na.omit(data4)
+
+    data4$Weather <- as.factor(data4$Weather)
+    data4$Traffic_Level <- as.factor(data4$Traffic_Level)
+    data4$Time_of_Day <- as.factor(data4$Time_of_Day)
+    data4$Vehicle_Type <- as.factor(data4$Vehicle_Type)
+
+    data4$Weather <- as.numeric(data4$Weather)
+    data4$Traffic_Level <- as.numeric(data4$Traffic_Level)
+    data4$Time_of_Day <- as.numeric(data4$Time_of_Day)
+    data4$Vehicle_Type <- as.numeric(data4$Vehicle_Type)
+
+    set.seed(11)  
+    kmeans <- kmeans(data4[, -1], centers = 3)
+
+    data4$KMeans_Cluster <- as.factor(kmeans$cluster)
+    ```
+
+2.  Use visualization techniques. Describe the result!
+
+    ```{r}
+    library(ggplot2)
+
+    cluster_centers <- as.data.frame(kmeans$centers)
+    cluster_centers$Cluster <- factor(1:3)
+
+    ggplot(data4, aes(x = Delivery_Time_min, y = Distance_km, color = KMeans_Cluster)) +
+      geom_point(size=3) +
+      labs(title = "K-Means Results", x = "Delivery_Time_min", y = "Distance_km")
+    ```
+
+    If the top of the blue cluster was green and the top of the green cluster was red, a more successful clustering would have been achieved.
+
+3.  Make your final comments clearly.
+
+    The K-Means results look good in general. However, as the Delivery_Time_min values ​​increase, there are clustering failures. If the top of the blue cluster was included in the green cluster and the top of the green cluster was included in the red cluster, we could have seen a better result.
+
+#### AGGLOMERATIVE CLUSTERING
+
+1.  Use appropriate functions and arguments.
+
+    ```{r}
+    set.seed(11) 
+    distance_matrix <- dist(data4[, c("Distance_km", "Delivery_Time_min")], method = "euclidean")
+    agglo_hclust <- hclust(distance_matrix, method = "average")  
+    k_clusters <- cutree(agglo_hclust, k = 3)
+
+    data4$Agglo_Cluster <- as.factor(k_clusters)
+
+    ```
+
+2.  Use visualization techniques. Describe the result!
+
+    ```{r}
+    ggplot(data4, aes(x = Delivery_Time_min, y = Distance_km, color = Agglo_Cluster)) +
+      geom_point() +
+      labs(title = "Agglomerative Clustering Result", x = "Delivery_Time_min", y = "Distance_km") +
+      theme_minimal()
+    ```
+
+    This is bad at the higher Distance_km values.
+
+3.  Make your final comments clearly.
+
+    The model clustered well for low Distance_km values, but as the Distance_km value increases, I see that the clustering becomes worse. Since I know that the time increases as the distance increases, I expected the clustering to be like 3 bubbles going diagonally up and to the right.
+
+b\. Compare the results you have found.
+
+I would choose the K-Means algorithm for this dataset. Because it seems more suitable for the cluster I expected and it separated the clusters more accurately. Both algorithms were confused for high values, but I can say that K-Means gave more accurate results.
+
+### 8. Apply one more 2 Classification Technique other than logreg.
+
+a\. Describe the reasons you choose those 2 techniques.
+
+I chose Decision Tree for its simplicity and interpretability, making it easy to understand and visualize decision-making. Random Forest was selected for its ability to improve accuracy by combining multiple trees, reducing overfitting, and providing insights into feature importance.
+
+#### DECISION TREE
+
+1.  Use appropriate functions and arguments.
+
+    ```{r}
+    library(rpart)
+
+    data5 <- data
+    data5 <- data5[, !names(data5) %in% "Cluster"]
+
+    data5$Weather <- as.factor(data5$Weather)
+    data5$Traffic_Level <- as.factor(data5$Traffic_Level)
+    data5$Time_of_Day <- as.factor(data5$Time_of_Day)
+    data5$Vehicle_Type <- as.factor(data5$Vehicle_Type)
+
+    data5$Weather <- as.numeric(data5$Weather)
+    data5$Traffic_Level <- as.numeric(data5$Traffic_Level)
+    data5$Time_of_Day <- as.numeric(data5$Time_of_Day)
+    data5$Vehicle_Type <- as.numeric(data5$Vehicle_Type)
+
+    tree_model <- rpart(data5$Delivery_Time_min ~ ., data = data5[, -c(1, 9)], method = "anova")
+    ```
+
+2.  Use visualization techniques. Describe the result!
+
+    ```{r}
+    library(rpart.plot)
+    rpart.plot(tree_model)
+    ```
+
+    The root node splits the data based on the feature that provides the most significant improvement in predicting the target variable, and in this case, it is chosen as Distance_km. Following the initial split, the data is further divided by Preparation_Time_min.
+
+3.  Calculate the performance scores. Make your final comments clearly.
+
+    ```{r}
+    predictions <- predict(tree_model, newdata = data5[, -c(1, 9)])
+    actual_values <- data5$Delivery_Time_min
+
+    MAE <- mean(abs(predictions - actual_values))
+    MSE <- mean((predictions - actual_values)^2)
+    RMSE <- sqrt(MSE)
+    SSE <- sum((predictions - actual_values)^2)
+    SST <- sum((actual_values - mean(actual_values))^2)
+    R2 <- 1 - (SSE / SST)
+
+    cat("MAE:", MAE, "\n")
+    cat("MSE:", MSE, "\n")
+    cat("RMSE:", RMSE, "\n")
+    cat("R-squared:", R2, "\n")
+    ```
+
+    MAE : This indicates that, on average the models predictions are off by about 8.90 mins.
+
+    MSE : This suggest that the average squered error between predicted and actual values is 158.5.
+
+    RMSE : RMSE is 12.5 meaning the typical prediction error is around 12.5 mins.
+
+    R-squared : This means that %67.42 of the variation in Delivery_Time_min is explained by the features.
+
+#### RANDOM FOREST CLASSIFIER
+
+1.  Use appropriate functions and arguments.
+
+    ```{r}
+    library(randomForest)
+    data5_clean <- na.omit(data5)
+    rf_model <- randomForest(Delivery_Time_min ~ ., data = data5_clean, ntree = 100)
+    ```
+
+2.  Use visualization techniques. Describe the result!
+
+    ```{r}
+    plot(rf_model)
+    ```
+
+    The more trees, the less error occur.
+
+3.  Calculate the performance scores. Make your final comments clearly.
+
+    ```{r}
+    predictions <- predict(rf_model, data5_clean)
+
+    MAE <- mean(abs(predictions - data5_clean$Delivery_Time_min))
+    MSE <- mean((predictions - data5_clean$Delivery_Time_min)^2)
+    RMSE <- sqrt(MSE)
+
+    SS_total <- sum((data5_clean$Delivery_Time_min - mean(data5_clean$Delivery_Time_min))^2)
+    SS_residual <- sum((data5_clean$Delivery_Time_min - predictions)^2)
+    R_squared <- 1 - (SS_residual / SS_total)
+
+    # Print the results
+    cat("MAE:", MAE, "\n")
+    cat("MSE:", MSE, "\n")
+    cat("RMSE:", RMSE, "\n")
+    cat("R-squared:", R_squared, "\n")
+    ```
+
+    MAE : 4.01 means that, the models predictions are off by about 4 minutes.
+
+    MSE : 34.2, suggest that the squared differences between predicted and actual values are implying the model fits well.
+
+    RMSE : The typical prediction error is around 5.8 mins.
+
+    R-squared : 0.93 is quite high, meaning that %93 of the Delivery_Time_min is explained by the model.
+
+b\. Compare the results you have found.
+
+I would choose Random Forest over Decision Tree because it provides a much better performance with lower error rates and a higher R-squared value (0.93 vs. 0.67). The Random Forest model outperforms the Decision Tree by reducing overfitting and explaining most of the variance in the data, making it more accurate and reliable for predictions.
+
+### X. Use the PCA results you have found in step 5; and re-implement just one of the classification technique you used. Compare : "results with original data" and "results with components", make your comments.
+
+For this chapter, I will use Random Forest Classifier from 8.2.
+
+At first , we need to convert pca_data to a data frame.
+
+```{r}
+numerical_cols_clean <- data5_clean[, c("Distance_km", "Preparation_Time_min", "Courier_Experience_yrs", "Delivery_Time_min")]
+
+num_data_scaled_clean <- scale(numerical_cols_clean)
+
+pca_clean <- prcomp(num_data_scaled_clean, center = TRUE, scale. = TRUE)
+
+pca_data <- as.data.frame(pca_clean$x)
+
+pca_data$Delivery_Time_min <- data5_clean$Delivery_Time_min
+
+print(head(pca_data))
+```
+
+Now, I can reimplement Random Forest using PCA data.
+
+```{r}
+library(randomForest)
+rf_model_pca <- randomForest(Delivery_Time_min ~ ., data = pca_data, ntree = 100)
+
+predictions_pca <- predict(rf_model_pca, newdata = pca_data)
+mae_pca <- mean(abs(predictions_pca - pca_data$Delivery_Time_min))
+mse_pca <- mean((predictions_pca - pca_data$Delivery_Time_min)^2)
+rmse_pca <- sqrt(mse_pca)
+r_squared_pca <- 1 - (sum((predictions_pca - pca_data$Delivery_Time_min)^2) / 
+                      sum((pca_data$Delivery_Time_min - mean(pca_data$Delivery_Time_min))^2))
+```
+
+Let's check the results.
+
+```{r}
+cat("MAE:", mae_pca, "\n")
+cat("MSE:", mse_pca, "\n")
+cat("RMSE:", rmse_pca, "\n")
+cat("R-squared:", r_squared_pca, "\n")
+```
+
+With the original data, the model performed well, but using PCA significantly improved performance metrics. Including a notable increase in R-squared from 0.93 to 0.99, indicating better variance explanation with reduced dimensions. At this point, I would use PCA.
+
+### Y. Missing Data Imputation.
+
+1.  Use an imputation method to impute those NA value. Continue with complete data for the following steps.
+
+    ```{r}
+    library(mice)
+
+    data$Weather <- as.factor(data$Weather)
+    data$Traffic_Level <- as.factor(data$Traffic_Level)
+    data$Time_of_Day <- as.factor(data$Time_of_Day)
+    data$Vehicle_Type <- as.factor(data$Vehicle_Type)
+
+    methods <- make.method(data)
+
+    methods[["Courier_Experience_yrs"]] <- "norm.predict"
+    methods[["Preparation_Time_min"]] <- "norm.predict"
+    methods[["Distance_km"]] <- "norm.predict"
+
+    methods[["Weather"]] <- "polyreg"
+    methods[["Traffic_Level"]] <- "polyreg"
+    methods[["Time_of_Day"]] <- "polyreg"
+    methods[["Vehicle_Type"]] <- "polyreg"
+
+    data_imputed <- mice(data, m = 1, method = methods, seed = 123)
+
+    data_imputed <- complete(data_imputed)
+
+    ```
+
+    To see is there any missing value :
+
+    ```{r}
+    anyNA(data_imputed)
+    ```
+
+    There is no missing data.
+
+2.  Apply the classification applications (6 or 8.1 or 8.2). Apply the classification "data with missing values" and "data with imputed values." Compare the "results with missing values" and "result with imputed values". Which performance score you choose? What is your final decision?
+
+    I will use Random Forest again.
+
+    ```{r}
+    library(randomForest)
+    rf_imputed <- randomForest(Delivery_Time_min ~ ., data = data_imputed, ntree = 100)
+    pred_imputed <- predict(rf_imputed, data_imputed)
+    mae_imputed <- mean(abs(pred_imputed - data_imputed$Delivery_Time_min))
+    mse_imputed <- mean((pred_imputed - data_imputed$Delivery_Time_min)^2)
+    rmse_imputed <- sqrt(mse_imputed)
+    r_squared_imputed <- 1 - sum((pred_imputed - data_imputed$Delivery_Time_min)^2) / 
+                            sum((mean(data_imputed$Delivery_Time_min) - data_imputed$Delivery_Time_min)^2)
+    ```
+
+    Now, see the results for imputed values.
+
+    ```{r}
+    cat("MAE:", mae_imputed, "\n")
+    cat("MSE:", mse_imputed, "\n")
+    cat("RMSE:", rmse_imputed, "\n")
+    cat("R-squared:", r_squared_imputed, "\n")
+    ```
+
+    As we can see here, our values ​​have improved very, very slightly. The reason for this improvement may be that the missing values ​​are less than the number of total rows. At this point, even if there is not much change between them, I choose the data that has no missing values ​​and train my model.
+
+### Z. Imbalanced dataset.
+
+1.  Use oversampling, undersampling or both, to balance your data. Continue with the balanced data for the following steps.
+
+    I will use both on Logistic Regression that I have implement at 6.
+
+    ```{r}
+    library(nnet)
+
+    data2 <- data[complete.cases(data), ]
+
+    car_samples <- data2[data2$Vehicle_Type == "Car", ]
+    scooter_samples <- data2[data2$Vehicle_Type == "Scooter", ]
+    bike_samples <- data2[data2$Vehicle_Type == "Bike", ]
+
+    set.seed(10)
+
+    car_samples <- car_samples[sample(nrow(car_samples), 150), ]
+    scooter_samples <- scooter_samples[sample(nrow(scooter_samples), 150), ]
+    bike_samples <- bike_samples[sample(nrow(bike_samples), 150), ]
+
+    data2 <- rbind(car_samples, scooter_samples, bike_samples)
+    data2 <- data2[sample(nrow(data2)), ]
+
+    multinom_model <- multinom(Vehicle_Type ~ Distance_km + Weather + Traffic_Level + Time_of_Day + Preparation_Time_min + Courier_Experience_yrs + Delivery_Time_min, data = data2)
+
+    summary(multinom_model)
+    ```
+
+2.  In just one of your applications(6 or 8.1 or 8.2), apply the classification algorithm to "imbalanced data" and "balanced data". Compare the "results with imbalanced data" and "results with non-balanced data". Which performance score you choose? What is your final decision.
+
+    ```{r}
+    library(caret)
+    library(ggplot2)
+
+    predictions <- predict(multinom_model, newdata = data2, type = "class")
+    conf_matrix <- confusionMatrix(factor(predictions), factor(data2$Vehicle_Type))
+    conf_matrix_df <- as.data.frame(as.table(conf_matrix$table))
+
+    colnames(conf_matrix_df) <- c("Actual", "Predicted", "Freq")
+
+    ggplot(conf_matrix_df, aes(x = Actual, y = Predicted, fill = Freq)) +
+      geom_tile() +
+      geom_text(aes(label = Freq), color = "white", size = 4) +
+      scale_fill_gradient(low = "white", high = "black") +
+      labs(title = "Confusion Matrix", x = "Actual", y = "Predicted") +
+      theme_minimal()
+    ```
+
+    ```{r}
+    print(conf_matrix)
+    ```
+
+    The model's accuracy is 48.89% with non-balanced data, showing better performance in predicting the Bike class, but struggles with Car and Scooter. In contrast, with imbalanced data, accuracy drops to 44.67%, but predictions are more balanced across all classes, with better balanced accuracy for Scooter. The non-balanced data yields a stronger prediction for Bike, while imbalanced data shows improved overall balance in predictions, despite the lower accuracy.
+
+    My preference would be to use non-balanced data because the model has a higher ability to correctly predict the Bike class and generally this type of model can focus more on correctly classifying important classes.
